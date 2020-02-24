@@ -23,43 +23,31 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
-  Map<int, Category> blocks = Map();
-  Map<Category, int> fifteenBlock = Map();
+  Map<DateTime, List<Category>> blocks = Map();
 
-  String timeString = '00:00:00';
-  final emptyTime = '00:00:00';
-
-  DateTime startTime;
-  int nextFifteenStart;
-
-  int get currentUnixTime =>
-      (DateTime.now().millisecondsSinceEpoch / 1000).floor();
+  // int get currentUnixTime =>
+  // (DateTime.now().millisecondsSinceEpoch / 1000).floor();
 
   Category active;
 
-  void setNextFifteenStart() {
-    setState(() {
-      nextFifteenStart = currentUnixTime - currentUnixTime % 900 + 900;
-    });
-  }
+  Timer timer;
 
   @override
   void initState() {
     super.initState();
-    setNextFifteenStart();
-    Timer.periodic(Duration(seconds: 1), (Timer t) => tick());
+    final now = DateTime.now();
+    final nextTick = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+      now.minute - now.minute % 15 + 15,
+    );
+    final timeUntilTick = nextTick.difference(now);
+    timer = Timer.periodic(timeUntilTick, (Timer t) => tick());
   }
 
   tick() {
-    if (active != null) {
-      // update timeString
-      final length = DateTime.now().difference(startTime);
-      setState(() {
-        timeString = length.toString().split('.').first.padLeft(8, "0");
-      });
-    }
-
-    if (currentUnixTime > nextFifteenStart) {
       // set that block color
       if (active != null) {
         fifteenBlock[active] =
