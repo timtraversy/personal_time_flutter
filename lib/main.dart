@@ -2,6 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'package:personal_time_flutter/models.dart';
+import 'package:personal_time_flutter/buttons.dart';
+import 'package:personal_time_flutter/display.dart';
+import 'package:personal_time_flutter/settings.dart';
+
 void main() => runApp(MyApp());
 
 class MyApp extends StatelessWidget {
@@ -10,7 +15,18 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Personal Time',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        appBarTheme: AppBarTheme(
+          color: Colors.transparent,
+          elevation: 0.0,
+          textTheme: TextTheme(
+            headline6: Theme.of(context)
+                .textTheme
+                .headline6
+                .copyWith(color: Colors.black87),
+          ),
+          actionsIconTheme: IconThemeData(color: Colors.black87),
+          iconTheme: IconThemeData(color: Colors.black87),
+        ),
       ),
       home: Home(),
     );
@@ -23,283 +39,177 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
-  Map<DateTime, List<Category>> blocks = Map();
+  // TODO: make this settable
+  final List<Category> _categories = [
+    Category(name: 'Entertainment', color: Colors.blue, id: 1),
+    Category(name: 'Productive', color: Colors.green, id: 2),
+    Category(name: 'Reading', color: Colors.deepOrange, id: 3),
+    Category(name: 'Exercise', color: Colors.red, id: 4),
+    Category(name: 'Dating', color: Colors.pink, id: 5),
+    Category(name: 'Friends', color: Colors.purple, id: 6),
+    Category(name: 'Maintenance', color: Colors.brown, id: 7),
+    Category(name: 'Work', color: Colors.cyan, id: 8),
+    Category(name: 'Sleep', color: Colors.blue, id: 9),
+    Category(name: 'Waste Time', color: Colors.lime, id: 10),
+  ];
 
-  // int get currentUnixTime =>
-  // (DateTime.now().millisecondsSinceEpoch / 1000).floor();
+  // TODO: make this settable
+  DateTime _initialStartDate;
+  DateTime _displayStartDate;
 
-  Category active;
+  Map<DateTime, int> _blocks = Map();
 
-  Timer timer;
+  Category _activeCategory;
+  bool _editing = false;
 
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    final nextTick = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      now.hour,
-      now.minute - now.minute % 15 + 15,
+
+    final _now = DateTime.now();
+    final _nextTick = DateTime(
+      _now.year,
+      _now.month,
+      _now.day,
+      _now.hour,
+      _now.minute - _now.minute % 15 + 15,
     );
-    final timeUntilTick = nextTick.difference(now);
-    timer = Timer.periodic(timeUntilTick, (Timer t) => tick());
+    Timer(_nextTick.difference(_now), _fifteenMinuteTick);
+
+    _initialStartDate = DateTime(
+      _now.year,
+      _now.month,
+      _now.day - 1,
+      _now.hour + 9,
+    );
+    _displayStartDate = _initialStartDate;
   }
 
-  tick() {
-      // set that block color
-      if (active != null) {
-        fifteenBlock[active] =
-            DateTime.now().difference(startTime).inMilliseconds;
-      }
-      blocks[nextFifteenStart] = majorityOfBlock();
-      setNextFifteenStart();
-      fifteenBlock.clear();
+  _fifteenMinuteTick() {
+    return;
+    if (_activeCategory != null) {
+      final _now = DateTime.now();
+      final _closestFifteenIncrement = (_now.minute / 15).round() * 15;
+      final DateTime _date = DateTime(
+        _now.year,
+        _now.month,
+        _now.day,
+        _now.hour,
+        _closestFifteenIncrement,
+      );
+      setState(() => _blocks[_date] = _activeCategory.id);
     }
+    Timer(const Duration(minutes: 15), _fifteenMinuteTick());
   }
 
-  Category majorityOfBlock() {
-    if (fifteenBlock.isEmpty) {
-      return null;
-    }
-
-    Category maxCategory;
-    int maxTime = 0;
-
-    fifteenBlock.forEach((key, value) {
-      if (value > maxTime) {
-        maxTime = value;
-        maxCategory = key;
-      }
-    });
-
-    return maxCategory;
+  void _onButtonPressed(Category selectedCategory) {
+    setState(() => _activeCategory =
+        _activeCategory == selectedCategory ? null : selectedCategory);
   }
 
-  onButtonPressed(Category selectedCategory) {
-    setState(() => timeString = emptyTime);
-    if (active == selectedCategory) {
-      int timeDiff = DateTime.now().difference(startTime).inMilliseconds;
-      if (timeDiff * 1000 > 10) {
-        fifteenBlock[active] = timeDiff;
-      }
-      startTime = null;
-      active = null;
-      return;
+  String get _title {
+    if (_initialStartDate == _displayStartDate) {
+      return 'Today';
     }
-    setState(() {
-      active = selectedCategory;
-      startTime = DateTime.now();
-    });
+    final _endDate = _displayStartDate.add(const Duration(days: 1));
+    String _dateText =
+        '${months[_displayStartDate.month - 1]} ${_displayStartDate.day}';
+    if (_displayStartDate != _endDate) {
+      _dateText += ' - ${months[_endDate.month - 1]} ${_endDate.day}';
+    }
+    return _dateText;
+  }
+
+  static const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Nov',
+    'Oct',
+    'Dec',
+  ];
+
+  void _onDaySwitched(DateTime startDate) {
+    setState(() => _displayStartDate = startDate);
+  }
+
+  void _goToSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => SettingsPage()),
+    );
+  }
+
+  void _goToToday() {
+    _onDaySwitched(_initialStartDate);
+  }
+
+  Widget get _leading {
+    if (_editing) {
+      return IconButton(
+        icon: Icon(Icons.clear),
+        onPressed: () => setState(() => _editing = false),
+      );
+    }
+    return IconButton(
+      icon: Icon(Icons.settings),
+      onPressed: _goToSettings,
+    );
+  }
+
+  List<Widget> get _actions {
+    return [
+      Visibility(
+        visible: _editing,
+        child: IconButton(icon: Icon(Icons.undo), onPressed: null),
+      ),
+      Visibility(
+        visible: _editing,
+        child: IconButton(icon: Icon(Icons.redo), onPressed: null),
+      ),
+      IconButton(
+        icon: Icon(Icons.calendar_today),
+        onPressed: _goToToday,
+      ),
+      IconButton(
+        icon: Icon(_editing ? Icons.done : Icons.edit),
+        onPressed: () => setState(() => _editing = !_editing),
+      ),
+    ];
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Today'),
-        actions: <Widget>[IconButton(icon: Icon(Icons.edit), onPressed: () {})],
+        title: Text(_title),
+        leading: _leading,
+        actions: _actions,
+        centerTitle: true,
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Column(
-            children: <Widget>[
-              Blocks(blocks),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  Text(
-                    timeString,
-                    style: Theme.of(context).textTheme.headline3.copyWith(
-                        color: active != null
-                            ? CategoryColor.values[active.index]
-                            : Colors.grey),
-                  ),
-                ],
-              ),
-              Buttons(active, onButtonPressed)
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class Blocks extends StatefulWidget {
-  Blocks(this.blocks);
-  final Map<int, Category> blocks;
-
-  @override
-  _BlocksState createState() => _BlocksState();
-}
-
-class _BlocksState extends State<Blocks> {
-  int start;
-  @override
-  void initState() {
-    super.initState();
-    final now = DateTime.now();
-    DateTime time;
-    if (now.hour > 6) {
-      time = DateTime(now.year, now.month, now.day - 6, 0);
-    } else {
-      time = DateTime(now.year, now.month, now.day - 1, 6, 30);
-    }
-    start = (time.millisecondsSinceEpoch / 1000).floor();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-          children: List.generate(
-              8,
-              (i) => Expanded(
-                    child: Row(
-                        children: List.generate(
-                            3, (j) => Expanded(child: hourColumn(i, j)))),
-                  ))),
-    );
-  }
-
-  Widget hourColumn(int row, int col) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(hourString(row, col), style: TextStyle(color: Colors.black54)),
-        Row(
-          children: List.generate(
-            4,
-            (k) => Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: AspectRatio(
-                  aspectRatio: 1.0,
-                  child: Container(
-                    decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(1.0),
-                        border: Border.all(color: Colors.black12),
-                        color: blockCategory(row * col * k)),
-                  ),
-                ),
-              ),
+        child: Column(
+          children: <Widget>[
+            Display(
+              active: _activeCategory,
+              blocks: _blocks,
+              categories: _categories,
+              startDate: _initialStartDate,
+              onDaySwitched: _onDaySwitched,
             ),
-          ),
-        )
-      ],
-    );
-  }
-
-  Color blockCategory(int index) {
-    Category category = widget.blocks[start + index * 900];
-    if (category != null) {
-      return CategoryColor.values[category.index];
-    }
-    return null;
-  }
-
-  String hourString(int row, int col) {
-    var hour = 6;
-    hour -= 1;
-    hour += row * 3 + col;
-    hour %= 12;
-    hour += 1;
-    final isPM = row > 1 && row < 6;
-    return '$hour ${isPM ? 'PM' : 'AM'}';
-  }
-}
-
-class Buttons extends StatelessWidget {
-  Buttons(this.active, this.onPressed);
-  final Category active;
-  final Function(Category) onPressed;
-  @override
-  Widget build(BuildContext context) {
-    final List<Widget> list = List.generate(
-      (Category.values.length / 2).floor(),
-      (i) => Row(
-        children: <Widget>[
-          CategoryButton(
-              category: Category.values[i * 2],
-              active: active,
-              onPressed: onPressed),
-          CategoryButton(
-              category: Category.values[i * 2 + 1],
-              active: active,
-              onPressed: onPressed),
-        ],
-      ),
-    );
-    list.add(Row(
-      children: <Widget>[
-        CategoryButton(
-            category: Category.Maintenance,
-            active: active,
-            onPressed: onPressed),
-      ],
-    ));
-    return Column(children: list);
-  }
-}
-
-class CategoryButton extends StatelessWidget {
-  CategoryButton({this.category, this.active, this.onPressed});
-  final Category category, active;
-  final Function(Category) onPressed;
-
-  bool get isActive => category == active;
-  MaterialColor get color => CategoryColor.values[category.index];
-
-  @override
-  Widget build(BuildContext context) {
-    final enumParts = category.toString().split('.');
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 5),
-        child: RawMaterialButton(
-          textStyle: TextStyle(color: isActive ? Colors.white : color),
-          highlightElevation: 0.0,
-          highlightColor: color.shade100,
-          elevation: 0.0,
-          shape: RoundedRectangleBorder(
-            side: BorderSide(color: color),
-            borderRadius: BorderRadius.circular(5.0),
-          ),
-          fillColor: isActive ? color : Colors.transparent,
-          padding: const EdgeInsets.all(0),
-          onPressed: () => onPressed(category),
-          child: Text(enumParts[1]),
+            Buttons(
+              active: _activeCategory,
+              onPressed: _onButtonPressed,
+              categories: _categories,
+            )
+          ],
         ),
       ),
     );
   }
-}
-
-class CategoryColor {
-  static final values = [
-    Colors.red,
-    Colors.teal,
-    Colors.blue,
-    Colors.orange,
-    Colors.brown,
-    Colors.pink,
-    Colors.cyan,
-    Colors.purple,
-    Colors.green,
-  ];
-}
-
-enum Category {
-  Entertainment,
-  Productive,
-  Sleep,
-  Reading,
-  Exercise,
-  Dating,
-  Friends,
-  Work,
-  Maintenance,
 }
